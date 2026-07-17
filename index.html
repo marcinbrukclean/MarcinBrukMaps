@@ -25,13 +25,14 @@
         <div id="map" class="map-view"></div>
 
         <div class="status-panel">
-          <p id="status">Znajdź obszar na mapie, a następnie powiększ do poziomu 16+, żeby pobrać budynki.</p>
+          <p id="status">Kliknij posesję na mapie, aby zapisać ją ręcznie. Automatyczne obrysy są funkcją testową.</p>
         </div>
 
         <div class="bottom-bar">
           <button id="locateBtnBottom" class="toolbar-button">Moja lokalizacja</button>
-          <button id="refreshBtn" class="toolbar-button">Pobierz budynki</button>
+          <button id="refreshBtn" class="toolbar-button">Spróbuj pobrać obrysy</button>
           <div class="saved-count">Zapisane: <span id="savedCount">0</span></div>
+          <p class="bottom-hint">Kliknij posesję na mapie, aby zapisać ją ręcznie. Automatyczne obrysy są funkcją testową.</p>
         </div>
       </main>
     </div>
@@ -40,21 +41,20 @@
       <div class="sheet-handle"></div>
       <div class="sheet-body">
         <div class="sheet-header">
-          <h2>Budynki OSM</h2>
+          <h2>Dodaj / edytuj posesję</h2>
           <button id="closeSheet" class="close-sheet" aria-label="Close">×</button>
         </div>
 
         <label class="field">
           <span>Status</span>
           <select id="statusSelect">
-            <option value="Potential client">Potential client</option>
-            <option value="Flyer delivered">Flyer delivered</option>
-            <option value="Not interested">Not interested</option>
-            <option value="Customer">Customer</option>
-            <option value="Come back later">Come back later</option>
+            <option value="Potential client">Potencjalny klient</option>
+            <option value="Flyer delivered">Ulotka wrzucona</option>
+            <option value="Not interested">Niezainteresowany</option>
+            <option value="Customer">Klient</option>
+            <option value="Come back later">Wrócić później</option>
           </select>
         </label>
-
         <label class="field">
           <span>Notatki</span>
           <textarea id="notes" rows="4" placeholder="Dodaj uwagi..."></textarea>

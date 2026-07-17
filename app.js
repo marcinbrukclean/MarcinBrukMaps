@@ -129,15 +129,16 @@ function createBuildingLayer(feature) {
   if (feature.geometry.type === 'Point') {
     const [lng, lat] = feature.geometry.coordinates;
     const color = getStatusColor(savedBuildings[String(feature.properties.id)]?.status);
+    const label = feature.properties.manual ? 'Punkt ręczny' : `Punkt ${feature.properties.id}`;
     const marker = L.circleMarker([lat, lng], {
       radius: 10,
       color,
       fillColor: color,
-      fillOpacity: 0.4,
+      fillOpacity: 0.6,
       weight: 2
     }).addTo(buildingsLayer);
     marker.on('click', () => openSheet(feature));
-    marker.bindTooltip(`Ręczny punkt ${feature.properties.id}`, { direction: 'top', sticky: true });
+    marker.bindTooltip(label, { direction: 'top', sticky: true });
     buildingLayers[String(feature.properties.id)] = marker;
     return;
   }
@@ -333,7 +334,7 @@ async function loadBuildings() {
   const center = map.getCenter();
   const query = `[out:json][timeout:10];way(around:60,${center.lat},${center.lng})["building"];out geom;`;
 
-  setStatus('Pobieranie budynków w promieniu 80 m...');
+  setStatus('Spróbuj pobrać obrysy w promieniu 80 m...');
   clearBuildings();
   renderSavedManualPoints();
 
@@ -355,7 +356,7 @@ async function loadBuildings() {
       return;
     }
     console.error(error);
-    setStatus(`Nie udało się pobrać obrysów budynków. Możesz nadal zaznaczać posesje ręcznie, klikając mapę. (${error.message})`, true);
+    setStatus('Nie udało się pobrać obrysów. Możesz dalej oznaczać posesje ręcznie.', true);
   }
 }
 
