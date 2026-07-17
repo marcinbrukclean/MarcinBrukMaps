@@ -1,6 +1,7 @@
 {
   "name": "MarcinBrukMaps",
   "short_name": "BrukMaps",
+  "description": "Field-mapping PWA for marking building prospects with OpenStreetMap and local notes.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#07111f",

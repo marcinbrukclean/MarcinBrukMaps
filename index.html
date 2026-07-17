@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#07111f" />
     <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="./style.css" />
     <title>MarcinBrukMaps</title>
   </head>
@@ -14,27 +15,59 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Offline-ready</p>
-          <h1>MarcinBrukMaps</h1>
+          <p class="eyebrow">Field mapper</p>
+          <h1>Marcin Bruk Clean</h1>
         </div>
-        <button id="locateBtn" class="pill">Locate</button>
+        <button id="locateBtn" class="pill">Moja lokalizacja</button>
       </header>
 
-      <main class="map-card">
-        <div id="mapViewport" class="map-viewport">
-          <img id="mapImage" src="./assets/offline-map.svg" alt="Offline map" />
-          <div id="markerLayer"></div>
+      <main class="main-content">
+        <div id="map" class="map-view"></div>
+
+        <div class="status-panel">
+          <p id="status">Znajdź obszar na mapie, a następnie powiększ do poziomu 16+, żeby pobrać budynki.</p>
         </div>
 
-        <div class="toolbar">
-          <button id="addMarkerBtn" class="action">Add marker</button>
-          <button id="resetViewBtn" class="action secondary">Reset</button>
+        <div class="bottom-bar">
+          <button id="locateBtnBottom" class="toolbar-button">Moja lokalizacja</button>
+          <button id="refreshBtn" class="toolbar-button">Pobierz budynki</button>
+          <div class="saved-count">Zapisane: <span id="savedCount">0</span></div>
         </div>
-
-        <p id="status" class="status">Ready for offline use.</p>
       </main>
     </div>
 
+    <div id="sheet" class="sheet hidden">
+      <div class="sheet-handle"></div>
+      <div class="sheet-body">
+        <div class="sheet-header">
+          <h2>Budynki OSM</h2>
+          <button id="closeSheet" class="close-sheet" aria-label="Close">×</button>
+        </div>
+
+        <label class="field">
+          <span>Status</span>
+          <select id="statusSelect">
+            <option value="Potential client">Potential client</option>
+            <option value="Flyer delivered">Flyer delivered</option>
+            <option value="Not interested">Not interested</option>
+            <option value="Customer">Customer</option>
+            <option value="Come back later">Come back later</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Notatki</span>
+          <textarea id="notes" rows="4" placeholder="Dodaj uwagi..."></textarea>
+        </label>
+
+        <div class="sheet-actions">
+          <button id="deleteBtn" class="secondary">Usuń / reset</button>
+          <button id="saveBtn" class="primary">Zapisz</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./vendor/leaflet/leaflet.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

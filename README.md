@@ -1,14 +1,10 @@
 # MarcinBrukMaps
 
-A simple offline-ready map app scaffold for iPhone-style use in a browser.
+A field-mapping progressive web app built for mobile use on iPhone-style browsers.
 
 ## Run locally
 
-Open the app in a browser:
-
-- Open [index.html](index.html)
-
-For a closer mobile experience, use a simple local server:
+Open the app in a browser or use a simple local server:
 
 ```bash
 python3 -m http.server 8000
@@ -18,13 +14,22 @@ Then visit http://localhost:8000.
 
 ## What it includes
 
-- Offline-capable PWA shell with service worker cache
-- Tap-to-place markers stored in local storage
-- A simple iPhone-friendly layout with safe-area spacing
-- A bundled SVG map asset for offline use
+- Leaflet map with live OpenStreetMap tiles
+- GPS location support with a current-position marker and accuracy circle
+- Building outlines loaded from OpenStreetMap through the Overpass API
+- Clickable buildings with status, notes, save, and reset controls
+- Local saving in `localStorage` for selected building status and notes
+- A PWA shell that caches local app files for installability
 
-## Next steps for a real iPhone app
+## Notes
 
-- Add real map tiles or offline MBTiles data
-- Add geolocation and route tracking
-- Wrap this in an Xcode/WebView project for App Store distribution
+- Map tiles are loaded online from OpenStreetMap at runtime.
+- Building outlines are fetched from the Overpass API only when the visible map area is small enough and zoomed to 16 or higher.
+- Selected building statuses and notes are stored locally on the device.
+- Full offline map tile support is not implemented yet and is a future stage.
+
+## Limitations
+
+- The service worker caches only the local app shell files.
+- Remote map tiles and Overpass requests still require an internet connection.
+- Overpass requests are debounced and limited to smaller visible areas to avoid overload.
