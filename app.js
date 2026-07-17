@@ -1,14 +1,18 @@
 const STORAGE_KEY = 'marcinbrukmaps-saved-buildings';
+const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
 
 const statusEl = document.getElementById('status');
 const locateBtn = document.getElementById('locateBtn');
 const locateBtnBottom = document.getElementById('locateBtnBottom');
+const startRouteBtn = document.getElementById('startRouteBtn');
+const stopRouteBtn = document.getElementById('stopRouteBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
 const savedCountEl = document.getElementById('savedCount');
+const routeDistanceEl = document.getElementById('routeDistance');
 const sheet = document.getElementById('sheet');
 const closeSheetBtn = document.getElementById('closeSheet');
 const statusSelect = document.getElementById('statusSelect');
@@ -20,12 +24,19 @@ const deleteBtn = document.getElementById('deleteBtn');
 
 let map = null;
 let buildingsLayer = null;
+let routeLayerGroup = null;
 let savedBuildings = loadSavedBuildings();
+let savedRoutes = loadSavedRoutes();
 let activeFeature = null;
 let pendingRequest = null;
 let requestTimer = null;
 let positionMarker = null;
 let accuracyCircle = null;
+let currentRoutePoints = [];
+let currentRoutePolyline = null;
+let currentRouteStartedAt = null;
+let currentRouteDistance = 0;
+let routeWatchId = null;
 const buildingLayers = {};
 
 function loadSavedBuildings() {
@@ -41,8 +52,188 @@ function saveSavedBuildings() {
   updateSavedCount();
 }
 
+function loadSavedRoutes() {
+  try {
+    return JSON.parse(localStorage.getItem(ROUTES_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveSavedRoutes() {
+  localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(savedRoutes));
+}
+
 function updateSavedCount() {
   savedCountEl.textContent = Object.keys(savedBuildings).length;
+}
+
+function updateRouteDistanceText() {
+  routeDistanceEl.textContent = (currentRouteDistance / 1000).toFixed(2);
+}
+
+function drawSavedRoute(route) {
+  if (!Array.isArray(route.points) || route.points.length < 2) {
+    return;
+  }
+
+  const latlngs = route.points.map((point) => [point.lat, point.lng]);
+  L.polyline(latlngs, {
+    color: '#3b82f6',
+    weight: 3,
+    opacity: 0.55
+  }).addTo(routeLayerGroup);
+}
+
+function drawSavedRoutes() {
+  if (!routeLayerGroup) {
+    return;
+  }
+
+  routeLayerGroup.clearLayers();
+  savedRoutes.forEach(drawSavedRoute);
+}
+
+function haversineDistance(a, b) {
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLat = lat2 - lat1;
+  const dLng = toRad(b.lng - a.lng);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const earthRadius = 6371000;
+  const c = 2 * Math.atan2(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng), Math.sqrt(1 - (sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng)));
+  return earthRadius * c;
+}
+
+function handleRoutePosition(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+  const timestamp = position.timestamp || Date.now();
+  const point = {
+    lat: latitude,
+    lng: longitude,
+    accuracy,
+    timestamp
+  };
+
+  if (accuracy > 80) {
+    setStatus('Słaby sygnał GPS - punkt pominięty.', true);
+    return;
+  }
+
+  if (currentRoutePoints.length > 0) {
+    const lastPoint = currentRoutePoints[currentRoutePoints.length - 1];
+    const timeDelta = (timestamp - lastPoint.timestamp) / 1000;
+    const distance = haversineDistance(lastPoint, point);
+
+    if (timeDelta < 10 && distance > 150) {
+      setStatus('Słaby sygnał GPS - punkt pominięty.', true);
+      return;
+    }
+
+    currentRouteDistance += distance;
+  }
+
+  currentRoutePoints.push(point);
+
+  if (!currentRoutePolyline) {
+    currentRoutePolyline = L.polyline([], {
+      color: '#60a5fa',
+      weight: 5,
+      opacity: 0.85
+    }).addTo(map);
+  }
+
+  currentRoutePolyline.addLatLng([latitude, longitude]);
+  updateRouteDistanceText();
+
+  if (currentRoutePoints.length === 1) {
+    map.setView([latitude, longitude], Math.max(map.getZoom(), 17), { animate: true });
+  }
+}
+
+function startRouteTracking() {
+  if (!navigator.geolocation) {
+    setStatus('GPS niedostępny.', true);
+    return;
+  }
+
+  if (routeWatchId !== null) {
+    return;
+  }
+
+  currentRoutePoints = [];
+  currentRouteDistance = 0;
+  currentRouteStartedAt = new Date().toISOString();
+
+  if (currentRoutePolyline) {
+    map.removeLayer(currentRoutePolyline);
+    currentRoutePolyline = null;
+  }
+
+  updateRouteDistanceText();
+  startRouteBtn.disabled = true;
+  stopRouteBtn.disabled = false;
+
+  routeWatchId = navigator.geolocation.watchPosition(
+    handleRoutePosition,
+    (error) => {
+      console.error(error);
+      setStatus('GPS niedostępny.', true);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 10000
+    }
+  );
+
+  setStatus('Rozpoczęto zapis trasy.');
+}
+
+function stopRouteTracking() {
+  if (routeWatchId === null) {
+    return;
+  }
+
+  navigator.geolocation.clearWatch(routeWatchId);
+  routeWatchId = null;
+
+  const endedAt = new Date().toISOString();
+
+  if (currentRoutePoints.length > 0) {
+    const route = {
+      id: `route-${Date.now()}`,
+      startedAt: currentRouteStartedAt,
+      endedAt,
+      distanceMeters: Math.round(currentRouteDistance),
+      points: currentRoutePoints
+    };
+
+    savedRoutes.push(route);
+    saveSavedRoutes();
+    drawSavedRoute(route);
+  }
+
+  if (currentRoutePolyline) {
+    map.removeLayer(currentRoutePolyline);
+    currentRoutePolyline = null;
+  }
+
+  currentRoutePoints = [];
+  currentRouteStartedAt = null;
+  currentRouteDistance = 0;
+  startRouteBtn.disabled = false;
+  stopRouteBtn.disabled = true;
+  updateRouteDistanceText();
+  setStatus('Zakończono trasę.');
+}
+
+function clearSavedRouteLayers() {
+  if (routeLayerGroup) {
+    routeLayerGroup.clearLayers();
+  }
 }
 
 function exportSavedBuildings() {
@@ -50,7 +241,8 @@ function exportSavedBuildings() {
     app: 'MarcinBrukMaps',
     version: 1,
     exportedAt: new Date().toISOString(),
-    savedBuildings
+    savedBuildings,
+    savedRoutes
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
@@ -88,9 +280,12 @@ function importSavedBuildings() {
       }
 
       savedBuildings = data.savedBuildings;
+      savedRoutes = Array.isArray(data.savedRoutes) ? data.savedRoutes : [];
       saveSavedBuildings();
+      saveSavedRoutes();
       clearBuildings();
       renderSavedManualPoints();
+      drawSavedRoutes();
       setStatus('Dane zostały zaimportowane.');
     } catch {
       setStatus('Nieprawidłowy plik kopii danych.', true);
@@ -98,16 +293,6 @@ function importSavedBuildings() {
   });
 
   fileInput.click();
-}
-
-function showMapError(message) {
-  setStatus(message, true);
-  statusEl.parentElement?.classList.add('warn');
-}
-
-function setStatus(message, isWarn = false) {
-  statusEl.textContent = message;
-  statusEl.classList.toggle('warn', Boolean(isWarn));
 }
 
 function getStatusColor(status) {
@@ -510,6 +695,7 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  routeLayerGroup = L.layerGroup().addTo(map);
   buildingsLayer = L.layerGroup().addTo(map);
   map.invalidateSize();
 
@@ -531,6 +717,8 @@ function registerControls() {
     locateBtnBottom.addEventListener('click', locateUser);
   }
   refreshBtn.addEventListener('click', () => scheduleBuildingLoad(true));
+  startRouteBtn.addEventListener('click', startRouteTracking);
+  stopRouteBtn.addEventListener('click', stopRouteTracking);
   exportBtn.addEventListener('click', exportSavedBuildings);
   importBtn.addEventListener('click', importSavedBuildings);
   closeSheetBtn.addEventListener('click', closeSheet);
@@ -552,6 +740,8 @@ window.addEventListener('DOMContentLoaded', () => {
   initMap();
   registerControls();
   updateSavedCount();
+  drawSavedRoutes();
+  updateRouteDistanceText();
 });
 
 if ('serviceWorker' in navigator) {
