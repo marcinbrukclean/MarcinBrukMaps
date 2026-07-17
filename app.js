@@ -12,6 +12,11 @@ const savedCountEl = document.getElementById('savedCount');
 const sheet = document.getElementById('sheet');
 const closeSheetBtn = document.getElementById('closeSheet');
 const statusSelect = document.getElementById('statusSelect');
+const potentialSelect = document.getElementById('potentialSelect');
+const serviceTypeSelect = document.getElementById('serviceTypeSelect');
+const estimatedAreaInput = document.getElementById('estimatedArea');
+const followUpDateInput = document.getElementById('followUpDate');
+const addressHintInput = document.getElementById('addressHint');
 const notesInput = document.getElementById('notes');
 const saveBtn = document.getElementById('saveBtn');
 const deleteBtn = document.getElementById('deleteBtn');
@@ -229,6 +234,11 @@ function openSheet(feature) {
   const id = String(feature.properties.id);
   const saved = savedBuildings[id] || { status: 'Potential client', notes: '' };
   statusSelect.value = saved.status;
+  potentialSelect.value = saved.potential || 'A';
+  serviceTypeSelect.value = saved.serviceType || 'Kostka brukowa';
+  estimatedAreaInput.value = saved.estimatedArea || '';
+  followUpDateInput.value = saved.followUpDate || '';
+  addressHintInput.value = saved.addressHint || '';
   notesInput.value = saved.notes || '';
   document.body.classList.add('sheet-open');
   sheet.classList.remove('hidden');
@@ -268,6 +278,11 @@ function saveActiveBuilding() {
     id,
     center,
     status: statusSelect.value,
+    potential: potentialSelect.value,
+    serviceType: serviceTypeSelect.value,
+    estimatedArea: estimatedAreaInput.value ? Number(estimatedAreaInput.value) : undefined,
+    followUpDate: followUpDateInput.value || undefined,
+    addressHint: addressHintInput.value.trim() || undefined,
     notes: notesInput.value.trim(),
     updatedAt: new Date().toISOString(),
     manual: Boolean(activeFeature.properties.manual)

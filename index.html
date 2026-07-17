@@ -58,6 +58,37 @@
           </select>
         </label>
         <label class="field">
+          <span>Potencjał</span>
+          <select id="potentialSelect">
+            <option value="A">A - bardzo dobry</option>
+            <option value="B">B - średni</option>
+            <option value="C">C - słaby</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Usługa</span>
+          <select id="serviceTypeSelect">
+            <option value="Kostka brukowa">Kostka brukowa</option>
+            <option value="Elewacja">Elewacja</option>
+            <option value="Dach">Dach</option>
+            <option value="Taras">Taras</option>
+            <option value="Podjazd">Podjazd</option>
+            <option value="Inne">Inne</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Szacowana powierzchnia m²</span>
+          <input id="estimatedArea" type="number" min="0" step="0.1" placeholder="Opcjonalnie" />
+        </label>
+        <label class="field">
+          <span>Data powrotu</span>
+          <input id="followUpDate" type="date" />
+        </label>
+        <label class="field">
+          <span>Adres / wskazówka</span>
+          <input id="addressHint" type="text" placeholder="Opcjonalnie" />
+        </label>
+        <label class="field">
           <span>Notatki</span>
           <textarea id="notes" rows="4" placeholder="Dodaj uwagi..."></textarea>
         </label>
