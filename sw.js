@@ -1,4 +1,4 @@
-const CACHE_NAME = 'marcinbrukmaps-v3';
+const CACHE_NAME = 'marcinbrukmaps-v4';
 const APP_SHELL = [
   './',
   './index.html',

@@ -173,12 +173,20 @@ function openSheet(feature) {
   const saved = savedBuildings[id] || { status: 'Potential client', notes: '' };
   statusSelect.value = saved.status;
   notesInput.value = saved.notes || '';
+  document.body.classList.add('sheet-open');
   sheet.classList.remove('hidden');
+  if (map) {
+    setTimeout(() => map.invalidateSize(), 120);
+  }
 }
 
 function closeSheet() {
   sheet.classList.add('hidden');
   activeFeature = null;
+  document.body.classList.remove('sheet-open');
+  if (map) {
+    setTimeout(() => map.invalidateSize(), 120);
+  }
 }
 
 function resetActiveBuilding() {
