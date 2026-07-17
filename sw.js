@@ -1,9 +1,10 @@
-const CACHE_NAME = 'marcinbrukmaps-v9';
+const CACHE_NAME = 'marcinbrukmaps-v13';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './hotfix.js',
   './manifest.json',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/leaflet.js',
