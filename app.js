@@ -6,6 +6,8 @@ const statusEl = document.getElementById('status');
 const locateBtn = document.getElementById('locateBtn');
 const locateBtnBottom = document.getElementById('locateBtnBottom');
 const refreshBtn = document.getElementById('refreshBtn');
+const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
 const savedCountEl = document.getElementById('savedCount');
 const sheet = document.getElementById('sheet');
 const closeSheetBtn = document.getElementById('closeSheet');
@@ -39,6 +41,61 @@ function saveSavedBuildings() {
 
 function updateSavedCount() {
   savedCountEl.textContent = Object.keys(savedBuildings).length;
+}
+
+function exportSavedBuildings() {
+  const payload = {
+    app: 'MarcinBrukMaps',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    savedBuildings
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+  const filename = `marcinbrukmaps-backup-${timestamp}.json`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+  setStatus('Wyeksportowano kopię danych.');
+}
+
+function importSavedBuildings() {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/json,.json';
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data?.app !== 'MarcinBrukMaps' || typeof data.savedBuildings !== 'object' || data.savedBuildings === null) {
+        throw new Error('invalid');
+      }
+
+      if (!confirm('Import danych zastąpi bieżące zapisane dane. Kontynuować?')) {
+        return;
+      }
+
+      savedBuildings = data.savedBuildings;
+      saveSavedBuildings();
+      clearBuildings();
+      renderSavedManualPoints();
+      setStatus('Dane zostały zaimportowane.');
+    } catch {
+      setStatus('Nieprawidłowy plik kopii danych.', true);
+    }
+  });
+
+  fileInput.click();
 }
 
 function showMapError(message) {
@@ -468,6 +525,8 @@ function registerControls() {
     locateBtnBottom.addEventListener('click', locateUser);
   }
   refreshBtn.addEventListener('click', () => scheduleBuildingLoad(true));
+  exportBtn.addEventListener('click', exportSavedBuildings);
+  importBtn.addEventListener('click', importSavedBuildings);
   closeSheetBtn.addEventListener('click', closeSheet);
   saveBtn.addEventListener('click', saveActiveBuilding);
   deleteBtn.addEventListener('click', resetActiveBuilding);
