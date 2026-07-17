@@ -215,6 +215,10 @@ h1 {
   overflow: hidden;
 }
 
+.sheet.hidden {
+  display: none;
+}
+
 .sheet:not(.hidden) {
   transform: translateY(0);
 }

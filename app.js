@@ -404,32 +404,62 @@ function updateFeatureLayerStyle(feature) {
   if (!layer) {
     return;
   }
-  layer.eachLayer((child) => {
-    if (child.setStyle) {
-      child.setStyle(styleFeature(feature));
+
+  const style = styleFeature(feature);
+
+  if (typeof layer.setStyle === 'function') {
+    try {
+      layer.setStyle(style);
+      return;
+    } catch (error) {
+      console.warn('Nie udało się ustawić stylu warstwy bezpośrednio:', error);
     }
-  });
+  }
+
+  if (typeof layer.eachLayer === 'function') {
+    layer.eachLayer((child) => {
+      if (typeof child.setStyle === 'function') {
+        child.setStyle(style);
+      }
+    });
+  }
 }
 
 function openSheet(feature) {
   activeFeature = feature;
   const id = String(feature.properties.id);
   const saved = savedBuildings[id] || { status: 'Potential client', notes: '' };
-  statusSelect.value = saved.status;
-  potentialSelect.value = saved.potential || 'A';
-  serviceTypeSelect.value = saved.serviceType || 'Kostka brukowa';
-  notesInput.value = saved.notes || '';
-  document.body.classList.add('sheet-open');
-  sheet.classList.remove('hidden');
+  if (statusSelect) {
+    statusSelect.value = saved.status;
+  }
+  if (potentialSelect) {
+    potentialSelect.value = saved.potential || 'A';
+  }
+  if (serviceTypeSelect) {
+    serviceTypeSelect.value = saved.serviceType || 'Kostka brukowa';
+  }
+  if (notesInput) {
+    notesInput.value = saved.notes || '';
+  }
+  if (document.body) {
+    document.body.classList.add('sheet-open');
+  }
+  if (sheet) {
+    sheet.classList.remove('hidden');
+  }
   if (map) {
     setTimeout(() => map.invalidateSize(), 120);
   }
 }
 
 function closeSheet() {
-  sheet.classList.add('hidden');
+  if (sheet) {
+    sheet.classList.add('hidden');
+  }
   activeFeature = null;
-  document.body.classList.remove('sheet-open');
+  if (document.body) {
+    document.body.classList.remove('sheet-open');
+  }
   if (map) {
     setTimeout(() => map.invalidateSize(), 120);
   }
@@ -437,12 +467,17 @@ function closeSheet() {
 
 function resetActiveBuilding() {
   if (!activeFeature) {
+    closeSheet();
     return;
   }
   const id = String(activeFeature.properties.id);
   delete savedBuildings[id];
   saveSavedBuildings();
-  updateFeatureLayerStyle(activeFeature);
+  try {
+    updateFeatureLayerStyle(activeFeature);
+  } catch (error) {
+    console.warn('Błąd odświeżania stylu warstwy przy usuwaniu:', error);
+  }
   setStatus('Dane budynku zostały zresetowane.');
   closeSheet();
 }
@@ -456,15 +491,20 @@ function saveActiveBuilding() {
   savedBuildings[id] = {
     id,
     center,
-    status: statusSelect.value,
-    potential: potentialSelect.value,
-    serviceType: serviceTypeSelect.value,
-    notes: notesInput.value.trim(),
+    status: statusSelect?.value || 'Potential client',
+    potential: potentialSelect?.value || 'A',
+    serviceType: serviceTypeSelect?.value || 'Kostka brukowa',
+    notes: notesInput?.value.trim() || '',
     updatedAt: new Date().toISOString(),
     manual: Boolean(activeFeature.properties.manual)
   };
+
   saveSavedBuildings();
-  updateFeatureLayerStyle(activeFeature);
+  try {
+    updateFeatureLayerStyle(activeFeature);
+  } catch (error) {
+    console.warn('Błąd odświeżania stylu warstwy przy zapisie:', error);
+  }
   setStatus('Zapisano dane budynku lokalnie.');
   closeSheet();
 }
