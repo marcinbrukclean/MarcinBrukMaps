@@ -27,19 +27,28 @@
         <div id="routeState" class="route-state" hidden>● Trasa aktywna - GPS zapisuje przejazd</div>
 
         <div class="status-panel">
-          <p id="status">Kliknij posesję na mapie, aby zapisać ją ręcznie. Automatyczne obrysy są funkcją testową.</p>
+          <p id="status">Kliknij mapę albo użyj przycisku Dodaj posesję.</p>
         </div>
 
         <div class="bottom-bar">
-          <button id="locateBtnBottom" class="toolbar-button">Moja lokalizacja</button>
-          <button id="startRouteBtn" class="toolbar-button small">Start trasy</button>
-          <button id="stopRouteBtn" class="toolbar-button small" disabled>Stop trasy</button>
-          <button id="refreshBtn" class="toolbar-button">Spróbuj pobrać obrysy</button>
-          <button id="exportBtn" class="toolbar-button small">Eksportuj dane</button>
-          <button id="importBtn" class="toolbar-button small">Importuj dane</button>
-          <div class="route-stats">Trasa: <span id="routeDistance">0.00</span> km</div>
-          <div class="saved-count">Zapisane: <span id="savedCount">0</span></div>
-          <p class="bottom-hint">Kliknij posesję na mapie, aby zapisać ją ręcznie. Automatyczne obrysy są funkcją testową. Śledzenie trasy działa tylko przy otwartej aplikacji.</p>
+          <div class="primary-actions">
+            <button id="locateBtnBottom" class="toolbar-button">Moja lokalizacja</button>
+            <button id="startRouteBtn" class="toolbar-button route-toggle">Start trasy</button>
+            <button id="addPropertyBtn" class="toolbar-button add-property">Dodaj posesję</button>
+          </div>
+
+          <div class="metrics-row">
+            <div class="route-stats">Trasa: <span id="routeDistance">0.00</span> km</div>
+            <div class="saved-count">Zapisane: <span id="savedCount">0</span></div>
+            <button id="moreBtn" class="more-button" type="button" aria-expanded="false">Więcej</button>
+          </div>
+
+          <div id="morePanel" class="more-panel hidden">
+            <button id="exportBtn" class="toolbar-button small">Eksportuj dane</button>
+            <button id="importBtn" class="toolbar-button small">Importuj dane</button>
+          </div>
+
+          <p class="bottom-hint">Kliknij mapę albo użyj przycisku Dodaj posesję. Śledzenie trasy działa tylko przy otwartej aplikacji.</p>
         </div>
       </main>
     </div>

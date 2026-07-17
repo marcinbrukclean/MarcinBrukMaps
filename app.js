@@ -8,6 +8,9 @@ const locateBtn = document.getElementById('locateBtn');
 const locateBtnBottom = document.getElementById('locateBtnBottom');
 const startRouteBtn = document.getElementById('startRouteBtn');
 const stopRouteBtn = document.getElementById('stopRouteBtn');
+const addPropertyBtn = document.getElementById('addPropertyBtn');
+const moreBtn = document.getElementById('moreBtn');
+const morePanel = document.getElementById('morePanel');
 const refreshBtn = document.getElementById('refreshBtn');
 const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
@@ -82,7 +85,8 @@ function updateRouteRecordingUi(isRecording) {
   }
 
   if (startRouteBtn) {
-    startRouteBtn.textContent = isRecording ? 'Trasa aktywna' : 'Start trasy';
+    startRouteBtn.textContent = isRecording ? 'Stop trasy' : 'Start trasy';
+    startRouteBtn.classList.toggle('is-recording', Boolean(isRecording));
   }
 
   if (stopRouteBtn) {
@@ -191,8 +195,10 @@ function startRouteTracking() {
   }
 
   updateRouteDistanceText();
-  startRouteBtn.disabled = true;
-  stopRouteBtn.disabled = false;
+  startRouteBtn.disabled = false;
+  if (stopRouteBtn) {
+    stopRouteBtn.disabled = false;
+  }
   updateRouteRecordingUi(true);
 
   routeWatchId = navigator.geolocation.watchPosition(
@@ -244,7 +250,9 @@ function stopRouteTracking() {
   currentRouteStartedAt = null;
   currentRouteDistance = 0;
   startRouteBtn.disabled = false;
-  stopRouteBtn.disabled = true;
+  if (stopRouteBtn) {
+    stopRouteBtn.disabled = true;
+  }
   updateRouteRecordingUi(false);
   updateRouteDistanceText();
   setStatus('Zakończono trasę.');
@@ -622,6 +630,36 @@ function createManualFallbackFeature(lat, lng) {
   };
 }
 
+
+function addManualPropertyAt(latlng) {
+  const feature = createManualFallbackFeature(latlng.lat, latlng.lng);
+  createBuildingLayer(feature);
+  openSheet(feature);
+  setStatus('Dodano posesję. Wypełnij dane i zapisz.');
+}
+
+function getBestPropertyLocation() {
+  if (currentRoutePoints.length > 0) {
+    const lastPoint = currentRoutePoints[currentRoutePoints.length - 1];
+    return { lat: lastPoint.lat, lng: lastPoint.lng };
+  }
+
+  if (positionMarker && typeof positionMarker.getLatLng === 'function') {
+    return positionMarker.getLatLng();
+  }
+
+  return map.getCenter();
+}
+
+function addPropertyFromButton() {
+  if (!map) {
+    return;
+  }
+
+  addManualPropertyAt(getBestPropertyLocation());
+}
+
+
 function renderSavedManualPoints() {
   Object.values(savedBuildings)
     .filter((item) => item.manual)
@@ -759,16 +797,13 @@ function initMap() {
   buildingsLayer = L.layerGroup().addTo(map);
   map.invalidateSize();
 
-  map.on('moveend', () => scheduleBuildingLoad());
-  map.on('zoomend', () => scheduleBuildingLoad());
+  // Automatyczne pobieranie obrysów OSM jest na razie wyłączone.
+  // Ręczne oznaczanie posesji działa stabilniej w terenie.
   map.on('click', (event) => {
-    const feature = createManualFallbackFeature(event.latlng.lat, event.latlng.lng);
-    createBuildingLayer(feature);
-    openSheet(feature);
-    setStatus('Dodano ręczny punkt budynku. Wypełnij status i notatki.');
+    addManualPropertyAt(event.latlng);
   });
 
-  setStatus('Znajdź obszar na mapie, a następnie powiększ do poziomu 16+, żeby pobrać budynki.');
+  setStatus('Kliknij mapę albo użyj przycisku Dodaj posesję.');
 }
 
 function registerControls() {
@@ -776,9 +811,28 @@ function registerControls() {
   if (locateBtnBottom) {
     locateBtnBottom.addEventListener('click', locateUser);
   }
-  refreshBtn.addEventListener('click', () => scheduleBuildingLoad(true));
-  startRouteBtn.addEventListener('click', startRouteTracking);
-  stopRouteBtn.addEventListener('click', stopRouteTracking);
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => scheduleBuildingLoad(true));
+  }
+  startRouteBtn.addEventListener('click', () => {
+    if (routeWatchId !== null) {
+      stopRouteTracking();
+    } else {
+      startRouteTracking();
+    }
+  });
+  if (stopRouteBtn) {
+    stopRouteBtn.addEventListener('click', stopRouteTracking);
+  }
+  if (addPropertyBtn) {
+    addPropertyBtn.addEventListener('click', addPropertyFromButton);
+  }
+  if (moreBtn && morePanel) {
+    moreBtn.addEventListener('click', () => {
+      const isHidden = morePanel.classList.toggle('hidden');
+      moreBtn.setAttribute('aria-expanded', String(!isHidden));
+    });
+  }
   exportBtn.addEventListener('click', exportSavedBuildings);
   importBtn.addEventListener('click', importSavedBuildings);
   closeSheetBtn.addEventListener('click', closeSheet);
