@@ -340,10 +340,23 @@ function getStatusColor(status) {
   }
 }
 
+function getPotentialColor(potential) {
+  switch (potential) {
+    case 'A':
+      return 'rgba(34, 197, 94, 0.82)';
+    case 'B':
+      return 'rgba(234, 179, 8, 0.86)';
+    case 'C':
+      return 'rgba(249, 115, 22, 0.82)';
+    default:
+      return 'rgba(59, 130, 246, 0.45)';
+  }
+}
+
 function styleFeature(feature) {
   const id = String(feature.properties.id);
   const saved = savedBuildings[id];
-  const color = saved ? getStatusColor(saved.status) : getStatusColor();
+  const color = saved ? getPotentialColor(saved.potential) : getPotentialColor();
   return {
     color,
     fillColor: color,
@@ -400,7 +413,7 @@ function getFeatureCenter(feature) {
 function createBuildingLayer(feature) {
   if (feature.geometry.type === 'Point') {
     const [lng, lat] = feature.geometry.coordinates;
-    const color = getStatusColor(savedBuildings[String(feature.properties.id)]?.status);
+    const color = getPotentialColor(savedBuildings[String(feature.properties.id)]?.potential);
     const label = feature.properties.manual ? 'Punkt ręczny' : `Punkt ${feature.properties.id}`;
     const marker = L.circleMarker([lat, lng], {
       radius: 10,
