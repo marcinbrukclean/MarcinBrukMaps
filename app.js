@@ -13,6 +13,7 @@ const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
 const savedCountEl = document.getElementById('savedCount');
 const routeDistanceEl = document.getElementById('routeDistance');
+const routeStateEl = document.getElementById('routeState');
 const sheet = document.getElementById('sheet');
 const closeSheetBtn = document.getElementById('closeSheet');
 const statusSelect = document.getElementById('statusSelect');
@@ -70,6 +71,23 @@ function updateSavedCount() {
 
 function updateRouteDistanceText() {
   routeDistanceEl.textContent = (currentRouteDistance / 1000).toFixed(2);
+}
+
+function updateRouteRecordingUi(isRecording) {
+  document.body.classList.toggle('route-recording', Boolean(isRecording));
+
+  if (routeStateEl) {
+    routeStateEl.hidden = !isRecording;
+    routeStateEl.textContent = isRecording ? '● Trasa aktywna - GPS zapisuje przejazd' : '';
+  }
+
+  if (startRouteBtn) {
+    startRouteBtn.textContent = isRecording ? 'Trasa aktywna' : 'Start trasy';
+  }
+
+  if (stopRouteBtn) {
+    stopRouteBtn.textContent = isRecording ? 'Zatrzymaj trasę' : 'Stop trasy';
+  }
 }
 
 function drawSavedRoute(route) {
@@ -175,6 +193,7 @@ function startRouteTracking() {
   updateRouteDistanceText();
   startRouteBtn.disabled = true;
   stopRouteBtn.disabled = false;
+  updateRouteRecordingUi(true);
 
   routeWatchId = navigator.geolocation.watchPosition(
     handleRoutePosition,
@@ -189,7 +208,7 @@ function startRouteTracking() {
     }
   );
 
-  setStatus('Rozpoczęto zapis trasy.');
+  setStatus('Trasa aktywna - GPS zapisuje przejazd.');
 }
 
 function stopRouteTracking() {
@@ -226,6 +245,7 @@ function stopRouteTracking() {
   currentRouteDistance = 0;
   startRouteBtn.disabled = false;
   stopRouteBtn.disabled = true;
+  updateRouteRecordingUi(false);
   updateRouteDistanceText();
   setStatus('Zakończono trasę.');
 }
@@ -782,6 +802,7 @@ window.addEventListener('DOMContentLoaded', () => {
   updateSavedCount();
   drawSavedRoutes();
   updateRouteDistanceText();
+  updateRouteRecordingUi(false);
 });
 
 if ('serviceWorker' in navigator) {
