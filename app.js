@@ -343,13 +343,13 @@ function getStatusColor(status) {
 function getPotentialColor(potential) {
   switch (potential) {
     case 'A':
-      return 'rgba(34, 197, 94, 0.82)';
+      return '#22c55e';
     case 'B':
-      return 'rgba(234, 179, 8, 0.86)';
+      return '#facc15';
     case 'C':
-      return 'rgba(249, 115, 22, 0.82)';
+      return '#f97316';
     default:
-      return 'rgba(59, 130, 246, 0.45)';
+      return '#38bdf8';
   }
 }
 
@@ -470,9 +470,6 @@ function openSheet(feature) {
   activeFeature = feature;
   const id = String(feature.properties.id);
   const saved = savedBuildings[id] || { status: 'Potential client', notes: '' };
-  if (statusSelect) {
-    statusSelect.value = saved.status;
-  }
   if (potentialSelect) {
     potentialSelect.value = saved.potential || 'A';
   }
@@ -532,7 +529,7 @@ function saveActiveBuilding() {
   savedBuildings[id] = {
     id,
     center,
-    status: statusSelect?.value || 'Potential client',
+    status: 'Potential client',
     potential: potentialSelect?.value || 'A',
     serviceType: serviceTypeSelect?.value || 'Kostka brukowa',
     notes: notesInput?.value.trim() || '',

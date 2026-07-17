@@ -434,3 +434,18 @@ button:disabled {
     padding: 8px 12px;
   }
 }
+
+
+.fixed-status {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: rgba(34, 197, 94, 0.14);
+  color: #bbf7d0;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+.status-fixed {
+  margin-bottom: 10px;
+}
