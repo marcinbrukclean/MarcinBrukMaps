@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Offline map placeholder">
+  <rect width="1200" height="800" fill="#0f172a"/>
+  <rect x="60" y="80" width="1080" height="640" rx="32" fill="#14213d"/>
+  <path d="M110 620 C 240 520, 330 470, 420 520 S 620 620, 770 510 S 980 410, 1080 500" stroke="#22c55e" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <path d="M180 240 L 320 180 L 430 260 L 560 170 L 710 220 L 920 150 L 1040 220" stroke="#38bdf8" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <circle cx="300" cy="220" r="16" fill="#f43f5e"/>
+  <circle cx="620" cy="330" r="16" fill="#f59e0b"/>
+  <circle cx="870" cy="210" r="16" fill="#34d399"/>
+  <text x="90" y="120" fill="#e2e8f0" font-size="34" font-family="Arial, sans-serif">Offline map base</text>
+  <text x="90" y="160" fill="#94a3b8" font-size="20" font-family="Arial, sans-serif">Tap anywhere to place a marker.</text>
+</svg>

@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light dark;
+  --bg: #07111f;
+  --card: rgba(15, 23, 42, 0.95);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --accent-2: #34d399;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #020617, #0f172a);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.eyebrow { margin: 0 0 4px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.2em; font-size: 0.7rem; font-weight: 700; }
+h1 { margin: 0; font-size: 1.2rem; }
+.pill, .action {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: white;
+}
+.action.secondary { background: rgba(255,255,255,0.16); color: var(--text); }
+.map-card {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(2, 8, 23, 0.45);
+}
+.map-viewport {
+  position: relative;
+  width: 100%;
+  min-height: 360px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0f172a;
+  touch-action: none;
+}
+#mapImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+#markerLayer {
+  position: absolute;
+  inset: 0;
+}
+.marker {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f43f5e;
+  border: 3px solid white;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.status {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+@media (min-width: 700px) {
+  .app-shell { padding-top: 24px; }
+  .map-viewport { min-height: 520px; }
+}

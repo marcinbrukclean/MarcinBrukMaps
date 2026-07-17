@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./style.css" />
+    <title>MarcinBrukMaps</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Offline-ready</p>
+          <h1>MarcinBrukMaps</h1>
+        </div>
+        <button id="locateBtn" class="pill">Locate</button>
+      </header>
+
+      <main class="map-card">
+        <div id="mapViewport" class="map-viewport">
+          <img id="mapImage" src="./assets/offline-map.svg" alt="Offline map" />
+          <div id="markerLayer"></div>
+        </div>
+
+        <div class="toolbar">
+          <button id="addMarkerBtn" class="action">Add marker</button>
+          <button id="resetViewBtn" class="action secondary">Reset</button>
+        </div>
+
+        <p id="status" class="status">Ready for offline use.</p>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
