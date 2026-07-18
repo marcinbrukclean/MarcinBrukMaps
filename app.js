@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'marcinbrukmaps-saved-buildings';
 const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes';
+const BACKUP_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-lite';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
 
@@ -52,21 +53,63 @@ let routeWatchId = null;
 let activePhotoData = '';
 const buildingLayers = {};
 
+function createLiteSavedBuildings(source) {
+  const lite = {};
+  Object.entries(source || {}).forEach(([id, item]) => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+    lite[id] = { ...item };
+    if (lite[id].photoData) {
+      lite[id].hasPhoto = true;
+    }
+    delete lite[id].photoData;
+  });
+  return lite;
+}
+
 function loadSavedBuildings() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  } catch {
-    return {};
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if (saved && typeof saved === 'object' && Object.keys(saved).length) {
+      return saved;
+    }
+  } catch (error) {
+    console.warn('Główny zapis jest uszkodzony, próbuję backup:', error);
   }
+
+  try {
+    const backup = JSON.parse(localStorage.getItem(BACKUP_STORAGE_KEY) || '{}');
+    if (backup && typeof backup === 'object') {
+      return backup;
+    }
+  } catch (error) {
+    console.warn('Backup też niedostępny:', error);
+  }
+
+  return {};
 }
 
 function saveSavedBuildings() {
   try {
+    localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(createLiteSavedBuildings(savedBuildings)));
+  } catch (error) {
+    console.warn('Nie udało się zapisać lekkiego backupu:', error);
+  }
+
+  try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBuildings));
   } catch (error) {
     console.error(error);
-    setStatus('Nie udało się zapisać danych. Zdjęcia mogą zajmować za dużo pamięci.', true);
-    return false;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    setStatus('Dane posesji zapisane bez zdjęć. Zdjęcie było zbyt ciężkie dla pamięci telefonu.', true);
+    updateSavedCount();
+    if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
+      renderSavedList();
+    }
+    return true;
   }
 
   updateSavedCount();
@@ -193,7 +236,7 @@ function compressPhotoFile(file) {
       const image = new Image();
       image.onerror = () => reject(new Error('Nie udało się przygotować zdjęcia.'));
       image.onload = () => {
-        const maxSize = 1000;
+        const maxSize = 520;
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
         const width = Math.max(1, Math.round(image.width * scale));
         const height = Math.max(1, Math.round(image.height * scale));
@@ -205,7 +248,7 @@ function compressPhotoFile(file) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(image, 0, 0, width, height);
 
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
+        resolve(canvas.toDataURL('image/jpeg', 0.52));
       };
       image.src = reader.result;
     };
@@ -1253,6 +1296,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initMap();
   registerControls();
   updateSavedCount();
+  renderSavedManualPoints();
   renderSavedList();
   drawSavedRoutes();
   updateRouteDistanceText();
