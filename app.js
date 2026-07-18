@@ -27,6 +27,10 @@ const statusSelect = document.getElementById('statusSelect');
 const potentialSelect = document.getElementById('potentialSelect');
 const serviceTypeSelect = document.getElementById('serviceTypeSelect');
 const notesInput = document.getElementById('notes');
+const streetInput = document.getElementById('streetInput');
+const photoInput = document.getElementById('photoInput');
+const photoPreview = document.getElementById('photoPreview');
+const removePhotoBtn = document.getElementById('removePhotoBtn');
 const saveBtn = document.getElementById('saveBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 
@@ -45,6 +49,7 @@ let currentRoutePolyline = null;
 let currentRouteStartedAt = null;
 let currentRouteDistance = 0;
 let routeWatchId = null;
+let activePhotoData = '';
 const buildingLayers = {};
 
 function loadSavedBuildings() {
@@ -56,11 +61,19 @@ function loadSavedBuildings() {
 }
 
 function saveSavedBuildings() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBuildings));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBuildings));
+  } catch (error) {
+    console.error(error);
+    setStatus('Nie udało się zapisać danych. Zdjęcia mogą zajmować za dużo pamięci.', true);
+    return false;
+  }
+
   updateSavedCount();
   if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
     renderSavedList();
   }
+  return true;
 }
 
 function loadSavedRoutes() {
@@ -150,6 +163,107 @@ function savedBuildingToFeature(item) {
   };
 }
 
+
+function renderPhotoPreview() {
+  if (!photoPreview || !removePhotoBtn) {
+    return;
+  }
+
+  if (activePhotoData) {
+    photoPreview.src = activePhotoData;
+    photoPreview.classList.remove('hidden');
+    removePhotoBtn.classList.remove('hidden');
+  } else {
+    photoPreview.removeAttribute('src');
+    photoPreview.classList.add('hidden');
+    removePhotoBtn.classList.add('hidden');
+  }
+}
+
+function compressPhotoFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Nie udało się odczytać zdjęcia.'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('Nie udało się przygotować zdjęcia.'));
+      image.onload = () => {
+        const maxSize = 1000;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildStreetNameFromReverseData(data) {
+  const address = data?.address || {};
+  const street = address.road || address.pedestrian || address.footway || address.path || address.cycleway;
+  const number = address.house_number;
+
+  if (street && number) {
+    return `${street} ${number}`;
+  }
+
+  if (street) {
+    return street;
+  }
+
+  if (address.neighbourhood) {
+    return address.neighbourhood;
+  }
+
+  if (typeof data?.display_name === 'string') {
+    return data.display_name.split(',').slice(0, 2).join(',').trim();
+  }
+
+  return '';
+}
+
+async function reverseGeocodeStreet(center) {
+  if (!Array.isArray(center) || center.length !== 2 || !navigator.onLine) {
+    return '';
+  }
+
+  try {
+    const [lat, lng] = center;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      return '';
+    }
+
+    const data = await response.json();
+    return buildStreetNameFromReverseData(data);
+  } catch (error) {
+    console.warn('Nie udało się pobrać ulicy:', error);
+    return '';
+  }
+}
+
+
 function renderSavedList() {
   if (!savedListContent) {
     return;
@@ -166,18 +280,22 @@ function renderSavedList() {
     const id = escapeHtml(item.id);
     const potential = escapeHtml(getPotentialLabel(item.potential));
     const service = escapeHtml(item.serviceType || 'Usługa nie wybrana');
+    const street = escapeHtml(item.streetName || item.addressHint || 'Ulica nieznana');
     const notes = item.notes ? `<p class="saved-card-notes">${escapeHtml(item.notes)}</p>` : '';
+    const photo = item.photoData ? `<img class="saved-card-photo" src="${item.photoData}" alt="Zdjęcie posesji" />` : '';
     const date = escapeHtml(formatSavedDate(item.updatedAt));
     const potentialClass = getPotentialClass(item.potential);
 
     return `
       <article class="saved-card" data-saved-card="${id}">
+        ${photo}
         <div class="saved-card-top">
           <span class="saved-number">${index + 1}</span>
           <span class="potential-badge ${potentialClass}">${potential}</span>
         </div>
         <div class="saved-card-main">
           <strong>${service}</strong>
+          <span>${street}</span>
           <span>Aktualizacja: ${date}</span>
         </div>
         ${notes}
@@ -650,12 +768,23 @@ function openSheet(feature) {
   activeFeature = feature;
   const id = String(feature.properties.id);
   const saved = savedBuildings[id] || { status: 'Potential client', notes: '' };
+
   if (potentialSelect) {
     potentialSelect.value = saved.potential || 'A';
   }
   if (serviceTypeSelect) {
     serviceTypeSelect.value = saved.serviceType || 'Kostka brukowa';
   }
+  if (streetInput) {
+    streetInput.value = saved.streetName || saved.addressHint || '';
+  }
+  activePhotoData = saved.photoData || '';
+  renderPhotoPreview();
+
+  if (photoInput) {
+    photoInput.value = '';
+  }
+
   if (notesInput) {
     notesInput.value = saved.notes || '';
   }
@@ -700,24 +829,50 @@ function resetActiveBuilding() {
   closeSheet();
 }
 
-function saveActiveBuilding() {
+async function saveActiveBuilding() {
   if (!activeFeature) {
     return;
   }
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+  }
+
   const id = String(activeFeature.properties.id);
   const center = getFeatureCenter(activeFeature);
+  const previous = savedBuildings[id] || {};
+  let streetName = streetInput?.value.trim() || '';
+
+  if (!streetName) {
+    setStatus('Zapisuję posesję i sprawdzam ulicę...');
+    streetName = await reverseGeocodeStreet(center);
+  }
+
   savedBuildings[id] = {
     id,
     center,
     status: 'Potential client',
     potential: potentialSelect?.value || 'A',
     serviceType: serviceTypeSelect?.value || 'Kostka brukowa',
+    streetName,
+    addressHint: streetName,
+    photoData: activePhotoData || '',
     notes: notesInput?.value.trim() || '',
     updatedAt: new Date().toISOString(),
+    createdAt: previous.createdAt || new Date().toISOString(),
     manual: Boolean(activeFeature.properties.manual)
   };
 
-  saveSavedBuildings();
+  const savedOk = saveSavedBuildings();
+
+  if (saveBtn) {
+    saveBtn.disabled = false;
+  }
+
+  if (!savedOk) {
+    return;
+  }
+
   try {
     updateFeatureLayerStyle(activeFeature);
   } catch (error) {
@@ -1043,6 +1198,37 @@ function registerControls() {
       }
     });
   }
+  if (photoInput) {
+    photoInput.addEventListener('change', async () => {
+      const file = photoInput.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        setStatus('Przygotowuję zdjęcie...');
+        activePhotoData = await compressPhotoFile(file);
+        renderPhotoPreview();
+        setStatus('Zdjęcie dodane. Naciśnij Zapisz, aby zapisać posesję.');
+      } catch (error) {
+        console.error(error);
+        setStatus('Nie udało się dodać zdjęcia.', true);
+      }
+    });
+  }
+
+  if (removePhotoBtn) {
+    removePhotoBtn.addEventListener('click', () => {
+      activePhotoData = '';
+      if (photoInput) {
+        photoInput.value = '';
+      }
+      renderPhotoPreview();
+      setStatus('Zdjęcie usunięte z formularza. Naciśnij Zapisz, aby zapisać zmianę.');
+    });
+  }
+
   exportBtn.addEventListener('click', exportSavedBuildings);
   importBtn.addEventListener('click', importSavedBuildings);
   closeSheetBtn.addEventListener('click', closeSheet);

@@ -85,6 +85,16 @@
           </select>
         </label>
         <label class="field">
+          <span>Ulica</span>
+          <input id="streetInput" type="text" placeholder="Ulica pobierze się automatycznie lub wpisz ręcznie" />
+        </label>
+        <label class="field">
+          <span>Zdjęcie</span>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+          <img id="photoPreview" class="photo-preview hidden" alt="Podgląd zdjęcia" />
+          <button id="removePhotoBtn" class="secondary photo-remove hidden" type="button">Usuń zdjęcie</button>
+        </label>
+        <label class="field">
           <span>Notatki</span>
           <textarea id="notes" rows="4" placeholder="Dodaj uwagi..."></textarea>
         </label>
