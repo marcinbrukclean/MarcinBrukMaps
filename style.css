@@ -575,3 +575,81 @@ button:disabled {
   border-radius: 14px;
   border: 1px solid rgba(226, 232, 240, 0.14);
 }
+
+
+/* Kompaktowa lista posesji */
+.saved-list-content {
+  gap: 8px;
+}
+
+.saved-card {
+  padding: 9px 10px;
+  gap: 7px;
+  border-radius: 13px;
+}
+
+.saved-card-top {
+  gap: 8px;
+}
+
+.saved-number {
+  width: 24px;
+  height: 24px;
+  font-size: 0.78rem;
+}
+
+.potential-badge {
+  padding: 5px 8px;
+  font-size: 0.78rem;
+}
+
+.saved-card-main {
+  gap: 2px;
+}
+
+.saved-card-main strong {
+  font-size: 0.9rem;
+}
+
+.saved-card-main span,
+.saved-card-notes {
+  font-size: 0.78rem;
+}
+
+.saved-card-actions {
+  gap: 6px;
+}
+
+.saved-card-action {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.saved-card-photo {
+  max-height: 120px;
+  border-radius: 11px;
+}
+
+@media (max-width: 520px) {
+  .saved-card {
+    padding: 8px 9px;
+  }
+
+  .saved-card-photo {
+    max-height: 105px;
+  }
+
+  .saved-card-main strong {
+    font-size: 0.86rem;
+  }
+
+  .saved-card-main span,
+  .saved-card-notes {
+    font-size: 0.74rem;
+  }
+
+  .saved-card-action {
+    padding: 7px 9px;
+    font-size: 0.78rem;
+  }
+}
