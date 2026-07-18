@@ -14,6 +14,10 @@ const morePanel = document.getElementById('morePanel');
 const refreshBtn = document.getElementById('refreshBtn');
 const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
+const savedListBtn = document.getElementById('savedListBtn');
+const savedListSheet = document.getElementById('savedListSheet');
+const savedListContent = document.getElementById('savedListContent');
+const closeSavedListBtn = document.getElementById('closeSavedList');
 const savedCountEl = document.getElementById('savedCount');
 const routeDistanceEl = document.getElementById('routeDistance');
 const routeStateEl = document.getElementById('routeState');
@@ -54,6 +58,9 @@ function loadSavedBuildings() {
 function saveSavedBuildings() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBuildings));
   updateSavedCount();
+  if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
+    renderSavedList();
+  }
 }
 
 function loadSavedRoutes() {
@@ -67,6 +74,179 @@ function loadSavedRoutes() {
 function saveSavedRoutes() {
   localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(savedRoutes));
 }
+
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[char]));
+}
+
+function getPotentialLabel(potential) {
+  switch (potential) {
+    case 'A':
+      return 'A - bardzo dobry';
+    case 'B':
+      return 'B - średni';
+    case 'C':
+      return 'C - słaby';
+    default:
+      return 'Nie ustawiono';
+  }
+}
+
+function getPotentialClass(potential) {
+  switch (potential) {
+    case 'A':
+      return 'potential-a';
+    case 'B':
+      return 'potential-b';
+    case 'C':
+      return 'potential-c';
+    default:
+      return 'potential-empty';
+  }
+}
+
+function formatSavedDate(value) {
+  if (!value) {
+    return 'brak daty';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'brak daty';
+  }
+
+  return new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function getSavedBuildingItems() {
+  return Object.values(savedBuildings)
+    .filter((item) => item && Array.isArray(item.center) && item.center.length === 2)
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+}
+
+function savedBuildingToFeature(item) {
+  return {
+    type: 'Feature',
+    properties: {
+      id: item.id,
+      manual: Boolean(item.manual)
+    },
+    geometry: {
+      type: 'Point',
+      coordinates: [item.center[1], item.center[0]]
+    }
+  };
+}
+
+function renderSavedList() {
+  if (!savedListContent) {
+    return;
+  }
+
+  const items = getSavedBuildingItems();
+
+  if (!items.length) {
+    savedListContent.innerHTML = '<div class="saved-list-empty">Nie masz jeszcze zapisanych posesji.</div>';
+    return;
+  }
+
+  savedListContent.innerHTML = items.map((item, index) => {
+    const id = escapeHtml(item.id);
+    const potential = escapeHtml(getPotentialLabel(item.potential));
+    const service = escapeHtml(item.serviceType || 'Usługa nie wybrana');
+    const notes = item.notes ? `<p class="saved-card-notes">${escapeHtml(item.notes)}</p>` : '';
+    const date = escapeHtml(formatSavedDate(item.updatedAt));
+    const potentialClass = getPotentialClass(item.potential);
+
+    return `
+      <article class="saved-card" data-saved-card="${id}">
+        <div class="saved-card-top">
+          <span class="saved-number">${index + 1}</span>
+          <span class="potential-badge ${potentialClass}">${potential}</span>
+        </div>
+        <div class="saved-card-main">
+          <strong>${service}</strong>
+          <span>Aktualizacja: ${date}</span>
+        </div>
+        ${notes}
+        <div class="saved-card-actions">
+          <button type="button" class="saved-card-action" data-show-building="${id}">Pokaż</button>
+          <button type="button" class="saved-card-action secondary-action" data-edit-building="${id}">Edytuj</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function openSavedList() {
+  renderSavedList();
+
+  if (morePanel) {
+    morePanel.classList.add('hidden');
+  }
+
+  if (moreBtn) {
+    moreBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  if (savedListSheet) {
+    savedListSheet.classList.remove('hidden');
+    savedListSheet.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeSavedList() {
+  if (savedListSheet) {
+    savedListSheet.classList.add('hidden');
+    savedListSheet.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function focusSavedBuilding(id, shouldEdit = false) {
+  const item = savedBuildings[id];
+
+  if (!item || !Array.isArray(item.center)) {
+    setStatus('Nie znaleziono tej posesji.', true);
+    return;
+  }
+
+  closeSavedList();
+
+  if (map) {
+    map.setView(item.center, Math.max(map.getZoom(), 18), { animate: true });
+  }
+
+  const layer = buildingLayers[id];
+  if (layer && typeof layer.openTooltip === 'function') {
+    layer.openTooltip();
+    setTimeout(() => {
+      if (typeof layer.closeTooltip === 'function') {
+        layer.closeTooltip();
+      }
+    }, 1800);
+  }
+
+  setStatus('Pokazuję posesję z listy.');
+
+  if (shouldEdit) {
+    setTimeout(() => {
+      openSheet(savedBuildingToFeature(item));
+    }, 180);
+  }
+}
+
 
 function updateSavedCount() {
   savedCountEl.textContent = Object.keys(savedBuildings).length;
@@ -843,6 +1023,26 @@ function registerControls() {
       moreBtn.setAttribute('aria-expanded', String(!isHidden));
     });
   }
+  if (savedListBtn) {
+    savedListBtn.addEventListener('click', openSavedList);
+  }
+  if (closeSavedListBtn) {
+    closeSavedListBtn.addEventListener('click', closeSavedList);
+  }
+  if (savedListSheet) {
+    savedListSheet.addEventListener('click', (event) => {
+      const showButton = event.target.closest('[data-show-building]');
+      const editButton = event.target.closest('[data-edit-building]');
+
+      if (showButton) {
+        focusSavedBuilding(showButton.dataset.showBuilding, false);
+      }
+
+      if (editButton) {
+        focusSavedBuilding(editButton.dataset.editBuilding, true);
+      }
+    });
+  }
   exportBtn.addEventListener('click', exportSavedBuildings);
   importBtn.addEventListener('click', importSavedBuildings);
   closeSheetBtn.addEventListener('click', closeSheet);
@@ -857,6 +1057,9 @@ function registerControls() {
     if (event.key === 'Escape' && !sheet.classList.contains('hidden')) {
       closeSheet();
     }
+    if (event.key === 'Escape' && savedListSheet && !savedListSheet.classList.contains('hidden')) {
+      closeSavedList();
+    }
   });
 }
 
@@ -864,6 +1067,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initMap();
   registerControls();
   updateSavedCount();
+  renderSavedList();
   drawSavedRoutes();
   updateRouteDistanceText();
   updateRouteRecordingUi(false);

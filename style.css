@@ -397,7 +397,7 @@ button:disabled {
 
 .more-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 10px;
   width: 100%;
 }
@@ -448,4 +448,106 @@ button:disabled {
 
 .status-fixed {
   margin-bottom: 10px;
+}
+
+
+.saved-list-sheet {
+  z-index: 21000;
+}
+
+.saved-list-content {
+  display: grid;
+  gap: 10px;
+  padding: 6px 0 max(22px, env(safe-area-inset-bottom));
+}
+
+.saved-list-empty {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.94);
+  color: var(--muted);
+  text-align: center;
+}
+
+.saved-card {
+  border: 1px solid rgba(226, 232, 240, 0.14);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.94);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.saved-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.saved-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.potential-badge {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-weight: 800;
+  color: #020617;
+}
+
+.potential-a {
+  background: #22c55e;
+}
+
+.potential-b {
+  background: #facc15;
+}
+
+.potential-c {
+  background: #f97316;
+}
+
+.potential-empty {
+  background: #38bdf8;
+}
+
+.saved-card-main {
+  display: grid;
+  gap: 4px;
+}
+
+.saved-card-main span,
+.saved-card-notes {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.saved-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.saved-card-action {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 12px;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+
+.saved-card-action.secondary-action {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
 }

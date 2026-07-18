@@ -44,6 +44,7 @@
           </div>
 
           <div id="morePanel" class="more-panel hidden">
+            <button id="savedListBtn" class="toolbar-button small">Lista posesji</button>
             <button id="exportBtn" class="toolbar-button small">Eksportuj dane</button>
             <button id="importBtn" class="toolbar-button small">Importuj dane</button>
           </div>
@@ -92,6 +93,18 @@
           <button id="deleteBtn" class="secondary">Usuń / reset</button>
           <button id="saveBtn" class="primary">Zapisz</button>
         </div>
+      </div>
+    </div>
+
+
+    <div id="savedListSheet" class="sheet saved-list-sheet hidden" aria-hidden="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-body">
+        <div class="sheet-header">
+          <h2>Lista posesji</h2>
+          <button id="closeSavedList" class="close-sheet" aria-label="Zamknij">×</button>
+        </div>
+        <div id="savedListContent" class="saved-list-content"></div>
       </div>
     </div>
 
