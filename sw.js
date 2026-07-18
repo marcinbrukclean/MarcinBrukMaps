@@ -1,10 +1,10 @@
-const CACHE_NAME = 'marcinbrukmaps-v24';
+const CACHE_NAME = 'marcinbrukmaps-v25';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
-  './hotfix.js',
+  './style.css?v=25',
+  './app.js?v=25',
+  './hotfix.js?v=25',
   './manifest.json',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/leaflet.js',
@@ -28,7 +28,39 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+function shouldUseNetworkFirst(request) {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return false;
+  }
+
+  return (
+    request.mode === 'navigate' ||
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.pathname.endsWith('/app.js') ||
+    url.pathname.endsWith('/style.css') ||
+    url.pathname.endsWith('/hotfix.js') ||
+    url.pathname.endsWith('/index.html')
+  );
+}
+
 self.addEventListener('fetch', (event) => {
+  if (shouldUseNetworkFirst(event.request)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) {

@@ -5,6 +5,11 @@ const MIRROR_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-v2';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
 const MAX_PHOTO_DATA_LENGTH = 180000;
+const LOCAL_DB_NAME = 'marcinbrukmaps-phone-db';
+const LOCAL_DB_VERSION = 1;
+const LOCAL_DB_STORE = 'records';
+const LOCAL_DB_BUILDINGS_KEY = 'savedBuildings';
+const LOCAL_DB_ROUTES_KEY = 'savedRoutes';
 
 const statusEl = document.getElementById('status');
 const locateBtn = document.getElementById('locateBtn');
@@ -54,6 +59,134 @@ let currentRouteDistance = 0;
 let routeWatchId = null;
 let activePhotoData = '';
 const buildingLayers = {};
+
+
+function openLocalDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
+
+    const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(LOCAL_DB_STORE)) {
+        db.createObjectStore(LOCAL_DB_STORE);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+  });
+}
+
+async function localDatabaseGet(key) {
+  const db = await openLocalDatabase();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LOCAL_DB_STORE, 'readonly');
+    const store = tx.objectStore(LOCAL_DB_STORE);
+    const request = store.get(key);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error || new Error('IndexedDB transaction failed'));
+    };
+  });
+}
+
+async function localDatabaseSet(key, value) {
+  const db = await openLocalDatabase();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LOCAL_DB_STORE, 'readwrite');
+    const store = tx.objectStore(LOCAL_DB_STORE);
+    store.put(value, key);
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve(true);
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error || new Error('IndexedDB write failed'));
+    };
+  });
+}
+
+function saveBuildingsToLocalDatabase(buildings) {
+  const clean = sanitizeSavedBuildings(buildings || {}, false).cleaned;
+
+  return localDatabaseSet(LOCAL_DB_BUILDINGS_KEY, clean).catch((error) => {
+    console.warn('Nie udało się zapisać posesji w bazie telefonu:', error);
+  });
+}
+
+function saveRoutesToLocalDatabase(routes) {
+  return localDatabaseSet(LOCAL_DB_ROUTES_KEY, Array.isArray(routes) ? routes : []).catch((error) => {
+    console.warn('Nie udało się zapisać tras w bazie telefonu:', error);
+  });
+}
+
+async function loadBuildingsFromLocalDatabase() {
+  try {
+    const stored = await localDatabaseGet(LOCAL_DB_BUILDINGS_KEY);
+    const normalized = normalizeStoredBuildings(stored);
+    return sanitizeSavedBuildings(normalized, false).cleaned;
+  } catch (error) {
+    console.warn('Nie udało się wczytać posesji z bazy telefonu:', error);
+    return {};
+  }
+}
+
+async function loadRoutesFromLocalDatabase() {
+  try {
+    const stored = await localDatabaseGet(LOCAL_DB_ROUTES_KEY);
+    return Array.isArray(stored) ? stored : [];
+  } catch (error) {
+    console.warn('Nie udało się wczytać tras z bazy telefonu:', error);
+    return [];
+  }
+}
+
+async function hydrateFromLocalDatabase() {
+  const dbBuildings = await loadBuildingsFromLocalDatabase();
+  const dbRoutes = await loadRoutesFromLocalDatabase();
+
+  const dbBuildingCount = Object.keys(dbBuildings).length;
+  const memoryBuildingCount = Object.keys(savedBuildings || {}).length;
+
+  if (dbBuildingCount > 0 && dbBuildingCount >= memoryBuildingCount) {
+    savedBuildings = dbBuildings;
+  } else if (memoryBuildingCount > 0) {
+    await saveBuildingsToLocalDatabase(savedBuildings);
+  }
+
+  if (Array.isArray(dbRoutes) && dbRoutes.length >= savedRoutes.length) {
+    savedRoutes = dbRoutes;
+  } else if (savedRoutes.length > 0) {
+    await saveRoutesToLocalDatabase(savedRoutes);
+  }
+
+  if (buildingsLayer) {
+    clearBuildings();
+    renderSavedManualPoints();
+  }
+
+  if (routeLayerGroup) {
+    drawSavedRoutes();
+  }
+
+  updateSavedCount();
+  renderSavedList();
+  setStatus(`Wczytano dane z telefonu. Zapisane: ${Object.keys(savedBuildings).length}.`);
+}
+
 
 function createLiteSavedBuildings(source) {
   const lite = {};
@@ -186,6 +319,7 @@ function saveSavedBuildings() {
   savedBuildings = sanitized;
 
   const lite = createLiteSavedBuildings(savedBuildings);
+  saveBuildingsToLocalDatabase(savedBuildings);
   const mainOk = safeStoreJson(STORAGE_KEY, savedBuildings);
   const mirrorOk = safeStoreJson(MIRROR_STORAGE_KEY, lite);
   const backupOk = safeStoreJson(BACKUP_STORAGE_KEY, lite);
@@ -197,8 +331,8 @@ function saveSavedBuildings() {
   }
 
   if (!mainOk && !mirrorOk && !backupOk) {
-    setStatus('Nie udało się zapisać danych w telefonie.', true);
-    return false;
+    setStatus('Zapisuję dane w lokalnej bazie telefonu.', true);
+    return true;
   }
 
   if (!mainOk && (mirrorOk || backupOk)) {
@@ -217,7 +351,13 @@ function loadSavedRoutes() {
 }
 
 function saveSavedRoutes() {
-  localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(savedRoutes));
+  try {
+    localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(savedRoutes));
+  } catch (error) {
+    console.warn('Nie udało się zapisać tras w prostej pamięci:', error);
+  }
+
+  saveRoutesToLocalDatabase(savedRoutes);
 }
 
 
@@ -1410,6 +1550,7 @@ window.addEventListener('DOMContentLoaded', () => {
   drawSavedRoutes();
   updateRouteDistanceText();
   updateRouteRecordingUi(false);
+  hydrateFromLocalDatabase();
 });
 
 if ('serviceWorker' in navigator) {
