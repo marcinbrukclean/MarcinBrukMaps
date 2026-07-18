@@ -119,12 +119,16 @@ async function localDatabaseSet(key, value) {
   });
 }
 
-function saveBuildingsToLocalDatabase(buildings) {
+async function saveBuildingsToLocalDatabase(buildings) {
   const clean = sanitizeSavedBuildings(buildings || {}, false).cleaned;
 
-  return localDatabaseSet(LOCAL_DB_BUILDINGS_KEY, clean).catch((error) => {
+  try {
+    await localDatabaseSet(LOCAL_DB_BUILDINGS_KEY, clean);
+    return true;
+  } catch (error) {
     console.warn('Nie udało się zapisać posesji w bazie telefonu:', error);
-  });
+    return false;
+  }
 }
 
 function saveRoutesToLocalDatabase(routes) {
@@ -330,15 +334,32 @@ function saveSavedBuildings() {
     renderSavedList();
   }
 
-  if (!mainOk && !mirrorOk && !backupOk) {
-    setStatus('Zapisuję dane w lokalnej bazie telefonu.', true);
-    return true;
+  return mainOk || mirrorOk || backupOk;
+}
+
+async function saveSavedBuildingsToPhone() {
+  const sanitized = sanitizeSavedBuildings(savedBuildings, false).cleaned;
+  savedBuildings = sanitized;
+
+  const lite = createLiteSavedBuildings(savedBuildings);
+
+  const dbOk = await saveBuildingsToLocalDatabase(savedBuildings);
+  const mainOk = safeStoreJson(STORAGE_KEY, savedBuildings);
+  const mirrorOk = safeStoreJson(MIRROR_STORAGE_KEY, lite);
+  const backupOk = safeStoreJson(BACKUP_STORAGE_KEY, lite);
+
+  updateSavedCount();
+
+  if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
+    renderSavedList();
   }
 
-  if (!mainOk && (mirrorOk || backupOk)) {
-    setStatus('Zapisano lekką kopię bez zdjęć, żeby nie przeciążyć telefonu.', true);
+  if (!dbOk && !mainOk && !mirrorOk && !backupOk) {
+    setStatus('Telefon zablokował zapis danych. Spróbuj otworzyć aplikację poza trybem prywatnym.', true);
+    return false;
   }
 
+  setStatus('Zapisano w pamięci telefonu.');
   return true;
 }
 
@@ -883,7 +904,7 @@ function importSavedBuildings() {
 
       savedBuildings = data.savedBuildings;
       savedRoutes = Array.isArray(data.savedRoutes) ? data.savedRoutes : [];
-      saveSavedBuildings();
+      saveSavedBuildingsToPhone();
       saveSavedRoutes();
       clearBuildings();
       renderSavedManualPoints();
@@ -1095,7 +1116,7 @@ function resetActiveBuilding() {
   }
   const id = String(activeFeature.properties.id);
   delete savedBuildings[id];
-  saveSavedBuildings();
+  saveSavedBuildingsToPhone();
   try {
     updateFeatureLayerStyle(activeFeature);
   } catch (error) {
@@ -1139,7 +1160,7 @@ async function saveActiveBuilding() {
     savedBuildings[id].photoData = activePhotoData;
   }
 
-  const savedOk = saveSavedBuildings();
+  const savedOk = await saveSavedBuildingsToPhone();
 
   if (saveBtn) {
     saveBtn.disabled = false;
@@ -1166,7 +1187,7 @@ async function saveActiveBuilding() {
 
       savedBuildings[id].streetName = resolvedStreet;
       savedBuildings[id].addressHint = resolvedStreet;
-      saveSavedBuildings();
+      saveSavedBuildingsToPhone();
       renderSavedManualPoints();
     }).catch((error) => {
       console.warn('Nie udało się dopisać ulicy po zapisie:', error);
@@ -1551,6 +1572,11 @@ window.addEventListener('DOMContentLoaded', () => {
   updateRouteDistanceText();
   updateRouteRecordingUi(false);
   hydrateFromLocalDatabase();
+});
+
+window.addEventListener('pagehide', () => {
+  saveSavedBuildings();
+  saveSavedRoutes();
 });
 
 if ('serviceWorker' in navigator) {
