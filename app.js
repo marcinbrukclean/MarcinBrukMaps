@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'marcinbrukmaps-saved-buildings';
 const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes';
 const BACKUP_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-lite';
+const MIRROR_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-v2';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
 const MAX_PHOTO_DATA_LENGTH = 180000;
@@ -93,72 +94,117 @@ function sanitizeSavedBuildings(source, dropAllPhotos = false) {
   return { cleaned, changed };
 }
 
+function normalizeStoredBuildings(value) {
+  const result = {};
+
+  if (!value) {
+    return result;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (!item || typeof item !== 'object') {
+        return;
+      }
+
+      const id = String(item.id || `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+      result[id] = { ...item, id };
+    });
+
+    return result;
+  }
+
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([key, item]) => {
+      if (!item || typeof item !== 'object') {
+        return;
+      }
+
+      const id = String(item.id || key);
+      result[id] = { ...item, id };
+    });
+  }
+
+  return result;
+}
+
+function safeStoreJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.warn(`Nie udało się zapisać ${key}:`, error);
+    return false;
+  }
+}
+
+function readSavedBuildingsFromKey(key, rescuePhotos) {
+  const raw = localStorage.getItem(key);
+
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = JSON.parse(raw);
+  const normalized = normalizeStoredBuildings(parsed);
+
+  if (!Object.keys(normalized).length) {
+    return null;
+  }
+
+  const result = sanitizeSavedBuildings(normalized, rescuePhotos);
+
+  if (result.changed) {
+    safeStoreJson(STORAGE_KEY, result.cleaned);
+    safeStoreJson(MIRROR_STORAGE_KEY, createLiteSavedBuildings(result.cleaned));
+    safeStoreJson(BACKUP_STORAGE_KEY, createLiteSavedBuildings(result.cleaned));
+  }
+
+  return result.cleaned;
+}
+
 function loadSavedBuildings() {
   const params = new URLSearchParams(window.location.search);
   const rescuePhotos = params.has('fixPhotos') || params.has('resetPhotos');
 
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    if (saved && typeof saved === 'object' && Object.keys(saved).length) {
-      const result = sanitizeSavedBuildings(saved, rescuePhotos);
-
-      if (result.changed) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.cleaned));
-          localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(createLiteSavedBuildings(result.cleaned)));
-        } catch (error) {
-          console.warn('Nie udało się zapisać oczyszczonych danych:', error);
-        }
-
-        setTimeout(() => {
-          setStatus('Usunięto zbyt ciężkie stare zdjęcia. Posesje zostały zachowane.', true);
-        }, 700);
+  for (const key of [STORAGE_KEY, MIRROR_STORAGE_KEY, BACKUP_STORAGE_KEY]) {
+    try {
+      const saved = readSavedBuildingsFromKey(key, rescuePhotos);
+      if (saved) {
+        return saved;
       }
-
-      return result.cleaned;
+    } catch (error) {
+      console.warn(`Nie udało się odczytać ${key}:`, error);
     }
-  } catch (error) {
-    console.warn('Główny zapis jest uszkodzony, próbuję backup:', error);
-  }
-
-  try {
-    const backup = JSON.parse(localStorage.getItem(BACKUP_STORAGE_KEY) || '{}');
-    if (backup && typeof backup === 'object') {
-      return backup;
-    }
-  } catch (error) {
-    console.warn('Backup też niedostępny:', error);
   }
 
   return {};
 }
 
 function saveSavedBuildings() {
-  try {
-    localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(createLiteSavedBuildings(savedBuildings)));
-  } catch (error) {
-    console.warn('Nie udało się zapisać lekkiego backupu:', error);
-  }
+  const sanitized = sanitizeSavedBuildings(savedBuildings, false).cleaned;
+  savedBuildings = sanitized;
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBuildings));
-  } catch (error) {
-    console.error(error);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    setStatus('Dane posesji zapisane bez zdjęć. Zdjęcie było zbyt ciężkie dla pamięci telefonu.', true);
-    updateSavedCount();
-    if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
-      renderSavedList();
-    }
-    return true;
-  }
+  const lite = createLiteSavedBuildings(savedBuildings);
+  const mainOk = safeStoreJson(STORAGE_KEY, savedBuildings);
+  const mirrorOk = safeStoreJson(MIRROR_STORAGE_KEY, lite);
+  const backupOk = safeStoreJson(BACKUP_STORAGE_KEY, lite);
 
   updateSavedCount();
+
   if (savedListSheet && !savedListSheet.classList.contains('hidden')) {
     renderSavedList();
   }
+
+  if (!mainOk && !mirrorOk && !backupOk) {
+    setStatus('Nie udało się zapisać danych w telefonie.', true);
+    return false;
+  }
+
+  if (!mainOk && (mirrorOk || backupOk)) {
+    setStatus('Zapisano lekką kopię bez zdjęć, żeby nie przeciążyć telefonu.', true);
+  }
+
   return true;
 }
 
@@ -931,27 +977,27 @@ async function saveActiveBuilding() {
   const id = String(activeFeature.properties.id);
   const center = getFeatureCenter(activeFeature);
   const previous = savedBuildings[id] || {};
-  let streetName = streetInput?.value.trim() || '';
-
-  if (!streetName) {
-    setStatus('Zapisuję posesję i sprawdzam ulicę...');
-    streetName = await reverseGeocodeStreet(center);
-  }
+  const streetName = streetInput?.value.trim() || previous.streetName || previous.addressHint || '';
+  const photoFits = typeof activePhotoData === 'string' && activePhotoData.length > 0 && activePhotoData.length <= MAX_PHOTO_DATA_LENGTH;
 
   savedBuildings[id] = {
     id,
     center,
     status: 'Potential client',
-    potential: potentialSelect?.value || 'A',
-    serviceType: serviceTypeSelect?.value || 'Kostka brukowa',
+    potential: potentialSelect?.value || previous.potential || 'A',
+    serviceType: serviceTypeSelect?.value || previous.serviceType || 'Kostka brukowa',
     streetName,
     addressHint: streetName,
-    photoData: activePhotoData || '',
     notes: notesInput?.value.trim() || '',
     updatedAt: new Date().toISOString(),
     createdAt: previous.createdAt || new Date().toISOString(),
-    manual: Boolean(activeFeature.properties.manual)
+    manual: Boolean(activeFeature.properties.manual),
+    hasPhoto: Boolean(photoFits || previous.hasPhoto || previous.photoData)
   };
+
+  if (photoFits) {
+    savedBuildings[id].photoData = activePhotoData;
+  }
 
   const savedOk = saveSavedBuildings();
 
@@ -968,8 +1014,24 @@ async function saveActiveBuilding() {
   } catch (error) {
     console.warn('Błąd odświeżania stylu warstwy przy zapisie:', error);
   }
-  setStatus('Zapisano dane budynku lokalnie.');
+
+  setStatus('Zapisano posesję lokalnie.');
   closeSheet();
+
+  if (!streetName && navigator.onLine) {
+    reverseGeocodeStreet(center).then((resolvedStreet) => {
+      if (!resolvedStreet || !savedBuildings[id]) {
+        return;
+      }
+
+      savedBuildings[id].streetName = resolvedStreet;
+      savedBuildings[id].addressHint = resolvedStreet;
+      saveSavedBuildings();
+      renderSavedManualPoints();
+    }).catch((error) => {
+      console.warn('Nie udało się dopisać ulicy po zapisie:', error);
+    });
+  }
 }
 
 function clearBuildings() {
