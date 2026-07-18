@@ -3,6 +3,7 @@ const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes';
 const BACKUP_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-lite';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
+const MAX_PHOTO_DATA_LENGTH = 180000;
 
 const statusEl = document.getElementById('status');
 const locateBtn = document.getElementById('locateBtn');
@@ -68,11 +69,53 @@ function createLiteSavedBuildings(source) {
   return lite;
 }
 
+function sanitizeSavedBuildings(source, dropAllPhotos = false) {
+  const cleaned = {};
+  let changed = false;
+
+  Object.entries(source || {}).forEach(([id, item]) => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+
+    const copy = { ...item };
+    const photoTooHeavy = typeof copy.photoData === 'string' && copy.photoData.length > MAX_PHOTO_DATA_LENGTH;
+
+    if (dropAllPhotos || photoTooHeavy) {
+      delete copy.photoData;
+      copy.hasPhoto = true;
+      changed = true;
+    }
+
+    cleaned[id] = copy;
+  });
+
+  return { cleaned, changed };
+}
+
 function loadSavedBuildings() {
+  const params = new URLSearchParams(window.location.search);
+  const rescuePhotos = params.has('fixPhotos') || params.has('resetPhotos');
+
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     if (saved && typeof saved === 'object' && Object.keys(saved).length) {
-      return saved;
+      const result = sanitizeSavedBuildings(saved, rescuePhotos);
+
+      if (result.changed) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.cleaned));
+          localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(createLiteSavedBuildings(result.cleaned)));
+        } catch (error) {
+          console.warn('Nie udało się zapisać oczyszczonych danych:', error);
+        }
+
+        setTimeout(() => {
+          setStatus('Usunięto zbyt ciężkie stare zdjęcia. Posesje zostały zachowane.', true);
+        }, 700);
+      }
+
+      return result.cleaned;
     }
   } catch (error) {
     console.warn('Główny zapis jest uszkodzony, próbuję backup:', error);
@@ -325,7 +368,11 @@ function renderSavedList() {
     const service = escapeHtml(item.serviceType || 'Usługa nie wybrana');
     const street = escapeHtml(item.streetName || item.addressHint || 'Ulica nieznana');
     const notes = item.notes ? `<p class="saved-card-notes">${escapeHtml(item.notes)}</p>` : '';
-    const photo = item.photoData ? `<img class="saved-card-photo" src="${item.photoData}" alt="Zdjęcie posesji" />` : '';
+    const photo = typeof item.photoData === 'string' && item.photoData.length <= MAX_PHOTO_DATA_LENGTH
+      ? `<img class="saved-card-photo" src="${item.photoData}" alt="Zdjęcie posesji" />`
+      : item.hasPhoto
+        ? '<div class="saved-card-photo-missing">Zdjęcie usunięte, aby odciążyć pamięć telefonu</div>'
+        : '';
     const date = escapeHtml(formatSavedDate(item.updatedAt));
     const potentialClass = getPotentialClass(item.potential);
 

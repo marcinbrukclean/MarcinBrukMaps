@@ -653,3 +653,14 @@ button:disabled {
     font-size: 0.78rem;
   }
 }
+
+
+.saved-card-photo-missing {
+  border-radius: 11px;
+  border: 1px dashed rgba(226, 232, 240, 0.22);
+  color: var(--muted);
+  background: rgba(15, 23, 42, 0.72);
+  padding: 10px;
+  font-size: 0.74rem;
+  text-align: center;
+}
