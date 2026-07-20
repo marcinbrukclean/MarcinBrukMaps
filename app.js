@@ -119,8 +119,12 @@ async function localDatabaseSet(key, value) {
   });
 }
 
-async function saveBuildingsToLocalDatabase(buildings) {
+async function saveBuildingsToLocalDatabase(buildings, allowEmpty = false) {
   const clean = sanitizeSavedBuildings(buildings || {}, false).cleaned;
+
+  if (!allowEmpty && !Object.keys(clean).length) {
+    return true;
+  }
 
   try {
     await localDatabaseSet(LOCAL_DB_BUILDINGS_KEY, clean);
@@ -269,9 +273,17 @@ function safeStoreJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
-  } catch (error) {
-    console.warn(`Nie udało się zapisać ${key}:`, error);
-    return false;
+  } catch (firstError) {
+    try {
+      [STORAGE_KEY, MIRROR_STORAGE_KEY, BACKUP_STORAGE_KEY].forEach((oldKey) => {
+        if (oldKey !== key) localStorage.removeItem(oldKey);
+      });
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (secondError) {
+      console.warn(`Nie udało się zapisać ${key}:`, secondError || firstError);
+      return false;
+    }
   }
 }
 
@@ -300,7 +312,23 @@ function readSavedBuildingsFromKey(key, rescuePhotos) {
   return result.cleaned;
 }
 
+function rescueLegacyStorageSpace() {
+  [STORAGE_KEY, MIRROR_STORAGE_KEY, BACKUP_STORAGE_KEY].forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const normalized = normalizeStoredBuildings(JSON.parse(raw));
+      const lite = createLiteSavedBuildings(normalized);
+      localStorage.removeItem(key);
+      localStorage.setItem(key, JSON.stringify(lite));
+    } catch (error) {
+      console.warn(`Nie udało się oczyścić starego zapisu ${key}:`, error);
+    }
+  });
+}
+
 function loadSavedBuildings() {
+  rescueLegacyStorageSpace();
   const params = new URLSearchParams(window.location.search);
   const rescuePhotos = params.has('fixPhotos') || params.has('resetPhotos');
 
@@ -322,8 +350,13 @@ function saveSavedBuildings() {
   const sanitized = sanitizeSavedBuildings(savedBuildings, false).cleaned;
   savedBuildings = sanitized;
 
+  if (!Object.keys(savedBuildings).length) {
+    updateSavedCount();
+    return true;
+  }
+
   const lite = createLiteSavedBuildings(savedBuildings);
-  saveBuildingsToLocalDatabase(savedBuildings);
+  saveBuildingsToLocalDatabase(savedBuildings, false);
   const mainOk = safeStoreJson(STORAGE_KEY, savedBuildings);
   const mirrorOk = safeStoreJson(MIRROR_STORAGE_KEY, lite);
   const backupOk = safeStoreJson(BACKUP_STORAGE_KEY, lite);
@@ -343,7 +376,7 @@ async function saveSavedBuildingsToPhone() {
 
   const lite = createLiteSavedBuildings(savedBuildings);
 
-  const dbOk = await saveBuildingsToLocalDatabase(savedBuildings);
+  const dbOk = await saveBuildingsToLocalDatabase(savedBuildings, true);
   const mainOk = safeStoreJson(STORAGE_KEY, savedBuildings);
   const mirrorOk = safeStoreJson(MIRROR_STORAGE_KEY, lite);
   const backupOk = safeStoreJson(BACKUP_STORAGE_KEY, lite);
@@ -1139,7 +1172,7 @@ async function saveActiveBuilding() {
   const center = getFeatureCenter(activeFeature);
   const previous = savedBuildings[id] || {};
   const streetName = streetInput?.value.trim() || previous.streetName || previous.addressHint || '';
-  const photoFits = typeof activePhotoData === 'string' && activePhotoData.length > 0 && activePhotoData.length <= MAX_PHOTO_DATA_LENGTH;
+  const photoFits = false;
 
   savedBuildings[id] = {
     id,
@@ -1575,8 +1608,13 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('pagehide', () => {
-  saveSavedBuildings();
-  saveSavedRoutes();
+  if (Object.keys(savedBuildings || {}).length > 0) {
+    saveSavedBuildings();
+  }
+
+  if (Array.isArray(savedRoutes) && savedRoutes.length > 0) {
+    saveSavedRoutes();
+  }
 });
 
 if ('serviceWorker' in navigator) {
