@@ -1,15 +1,15 @@
-const STORAGE_KEY = 'marcinbrukmaps-saved-buildings';
-const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes';
-const BACKUP_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-lite';
-const MIRROR_STORAGE_KEY = 'marcinbrukmaps-saved-buildings-v2';
+const STORAGE_KEY = 'marcinbrukmaps-properties-v28';
+const ROUTES_STORAGE_KEY = 'marcinbrukmaps-routes-v28';
+const BACKUP_STORAGE_KEY = 'marcinbrukmaps-properties-v28-backup';
+const MIRROR_STORAGE_KEY = 'marcinbrukmaps-properties-v28-mirror';
 const MIN_ZOOM_TO_LOAD = 16;
 const DEBOUNCE_MS = 1200;
 const MAX_PHOTO_DATA_LENGTH = 180000;
 const LOCAL_DB_NAME = 'marcinbrukmaps-phone-db';
 const LOCAL_DB_VERSION = 1;
 const LOCAL_DB_STORE = 'records';
-const LOCAL_DB_BUILDINGS_KEY = 'savedBuildings';
-const LOCAL_DB_ROUTES_KEY = 'savedRoutes';
+const LOCAL_DB_BUILDINGS_KEY = 'savedBuildingsV28';
+const LOCAL_DB_ROUTES_KEY = 'savedRoutesV28';
 
 const statusEl = document.getElementById('status');
 const locateBtn = document.getElementById('locateBtn');
@@ -59,6 +59,26 @@ let currentRouteDistance = 0;
 let routeWatchId = null;
 let activePhotoData = '';
 const buildingLayers = {};
+
+const OLD_BROKEN_STORAGE_KEYS = [
+  'marcinbrukmaps-saved-buildings',
+  'marcinbrukmaps-saved-buildings-lite',
+  'marcinbrukmaps-saved-buildings-v2'
+];
+
+function clearOldBrokenStorageOnce() {
+  try {
+    if (localStorage.getItem('marcinbrukmaps-v28-cleaned-old-storage') === 'yes') {
+      return;
+    }
+
+    OLD_BROKEN_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    localStorage.setItem('marcinbrukmaps-v28-cleaned-old-storage', 'yes');
+  } catch (error) {
+    console.warn('Nie udało się wyczyścić starego zapisu:', error);
+  }
+}
+
 
 
 function openLocalDatabase() {
@@ -192,7 +212,7 @@ async function hydrateFromLocalDatabase() {
 
   updateSavedCount();
   renderSavedList();
-  setStatus(`Wczytano dane z telefonu. Zapisane: ${Object.keys(savedBuildings).length}.`);
+  setStatus(`Wersja v28. Wczytano dane z telefonu. Zapisane: ${Object.keys(savedBuildings).length}.`);
 }
 
 
@@ -328,13 +348,11 @@ function rescueLegacyStorageSpace() {
 }
 
 function loadSavedBuildings() {
-  rescueLegacyStorageSpace();
-  const params = new URLSearchParams(window.location.search);
-  const rescuePhotos = params.has('fixPhotos') || params.has('resetPhotos');
+  clearOldBrokenStorageOnce();
 
   for (const key of [STORAGE_KEY, MIRROR_STORAGE_KEY, BACKUP_STORAGE_KEY]) {
     try {
-      const saved = readSavedBuildingsFromKey(key, rescuePhotos);
+      const saved = readSavedBuildingsFromKey(key, true);
       if (saved) {
         return saved;
       }
@@ -392,7 +410,7 @@ async function saveSavedBuildingsToPhone() {
     return false;
   }
 
-  setStatus('Zapisano w pamięci telefonu.');
+  setStatus(`Zapisano w telefonie. Zapisane: ${Object.keys(savedBuildings).length}.`);
   return true;
 }
 
@@ -1619,7 +1637,7 @@ window.addEventListener('pagehide', () => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((error) => {
+    navigator.serviceWorker.register('./sw.js?v=28').catch((error) => {
       console.warn('Service worker registration failed', error);
     });
   });

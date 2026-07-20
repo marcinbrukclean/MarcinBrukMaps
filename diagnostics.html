@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarcinBrukMaps diagnostyka zapisu</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#07111f; color:#e2e8f0; padding:24px; }
+    button { display:block; width:100%; margin:12px 0; padding:14px; border:0; border-radius:14px; font-weight:800; background:#38bdf8; color:white; }
+    pre { white-space:pre-wrap; background:#0f172a; padding:16px; border-radius:14px; }
+  </style>
+</head>
+<body>
+  <h1>Diagnostyka zapisu v28</h1>
+  <button id="test">Test zapisu</button>
+  <button id="show">Pokaż dane</button>
+  <button onclick="location.href='./?v=28'">Otwórz aplikację</button>
+  <pre id="out">Gotowe.</pre>
+
+  <script>
+    const out = document.getElementById('out');
+    const LS_KEY = 'marcinbrukmaps-diagnostics-v28';
+    const DB_NAME = 'marcinbrukmaps-phone-db';
+    const STORE = 'records';
+    const DB_KEY = 'diagnosticsV28';
+
+    function log(text) { out.textContent = text; }
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbSet(value) {
+      const db = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(value, DB_KEY);
+        tx.oncomplete = () => { db.close(); resolve(true); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+
+    async function dbGet() {
+      const db = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).get(DB_KEY);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+      });
+    }
+
+    document.getElementById('test').onclick = async () => {
+      const payload = { time: new Date().toISOString(), random: Math.random() };
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(payload));
+        await dbSet(payload);
+        log('Zapis testowy wykonany. Odśwież stronę i kliknij „Pokaż dane”.');
+      } catch (e) {
+        log('Błąd zapisu: ' + e.message);
+      }
+    };
+
+    document.getElementById('show').onclick = async () => {
+      let ls = null;
+      let db = null;
+      try { ls = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch {}
+      try { db = await dbGet(); } catch (e) { db = 'Błąd DB: ' + e.message; }
+      log('localStorage:\n' + JSON.stringify(ls, null, 2) + '\n\nIndexedDB:\n' + JSON.stringify(db, null, 2));
+    };
+  </script>
+</body>
+</html>
